@@ -221,8 +221,8 @@ function loadReport() {
   if (userFilter) calParams.ownerId = userFilter;
 
   callAll('calendar.event.get', calParams, function(events) {
-    console.log('Всего событий:', events.length);
-    console.log('Первое событие:', JSON.stringify(events[0]));
+    document.getElementById('errorMsg').style.display = 'block';
+    document.getElementById('errorMsg').textContent = 'Событий получено: ' + events.length + ' | Первое: ' + JSON.stringify(events[0]);
    
     setProgress(40, 'Фильтрация событий с привязкой к CRM...');
 
