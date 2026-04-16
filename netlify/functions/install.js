@@ -224,6 +224,23 @@ function loadReport() {
   };
   if (userFilter) calParams.ownerId = userFilter;
 
+  document.getElementById('errorMsg').style.display = 'block';
+  document.getElementById('errorMsg').style.background = '#fff8e1';
+  document.getElementById('errorMsg').style.color = '#5d4037';
+  document.getElementById('errorMsg').innerHTML = 'Запрос: <pre>' + JSON.stringify(calParams, null, 2) + '</pre>';
+
+  BX24.callMethod('calendar.event.get', calParams, function(res) {
+    var dbg = document.getElementById('errorMsg');
+    if (res.error()) {
+      dbg.innerHTML += '<br><b>Ошибка:</b> ' + JSON.stringify(res.error());
+    } else {
+      var data = res.data();
+      dbg.innerHTML += '<br><b>Результат (' + (data ? data.length : 0) + ' событий):</b><pre style="font-size:11px;max-height:300px;overflow:auto">' + JSON.stringify(data && data[0], null, 2) + '</pre>';
+    }
+    hideProgress();
+    document.getElementById('btnLoad').disabled = false;
+  });
+  return;
   callAll('calendar.event.get', calParams, function(events) {
     var dbg = document.getElementById('errorMsg');
     dbg.style.display = 'block';
