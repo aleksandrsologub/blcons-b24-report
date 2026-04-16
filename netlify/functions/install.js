@@ -217,15 +217,14 @@ function loadReport() {
   document.getElementById('resultPanel').style.display = 'none';
   setProgress(5, 'Загрузка событий календаря...');
 
-  var filter = {
-    '>DATE_FROM': dateFrom + 'T00:00:00',
-    '<DATE_TO': dateTo + 'T23:59:59',
-    CAL_TYPE: 'user',
-    SKIP_TIME: 'N'
+  var calParams = {
+    type: 'user',
+    from: dateFrom,
+    to: dateTo
   };
-  if (userFilter) filter.OWNER_ID = userFilter;
+  if (userFilter) calParams.ownerId = userFilter;
 
-  callAll('calendar.event.get', filter, function(events) {
+  callAll('calendar.event.get', calParams, function(events) {
     setProgress(40, 'Фильтрация событий с привязкой к CRM...');
 
     var crmEvents = events.filter(function(e) {
