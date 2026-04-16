@@ -225,6 +225,12 @@ function loadReport() {
   if (userFilter) calParams.ownerId = userFilter;
 
   callAll('calendar.event.get', calParams, function(events) {
+    var dbg = document.getElementById('errorMsg');
+    dbg.style.display = 'block';
+    dbg.style.background = '#e8f5e9';
+    dbg.style.borderColor = '#a5d6a7';
+    dbg.style.color = '#1b5e20';
+    dbg.innerHTML = '<b>Отладка:</b> получено событий: ' + events.length + '<br>Первое: <pre style="font-size:11px;overflow:auto;max-height:200px">' + JSON.stringify(events[0], null, 2) + '</pre>';
     setProgress(40, 'Фильтрация событий с привязкой к CRM...');
 
     var crmEvents = events.filter(function(e) {
