@@ -1,14 +1,4 @@
 exports.handler = async (event) => {
-  const method = event.httpMethod;
-
-  if (method === "POST") {
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-      body: "OK"
-    };
-  }
-
   const html = `<!DOCTYPE html>
 <html lang="ru">
 <head>
