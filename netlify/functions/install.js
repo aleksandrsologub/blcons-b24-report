@@ -571,6 +571,19 @@ function fetchEventsForUsers(userIds, dateFrom, dateTo) {
 function processEvents(events) {
   setProgress(65, 'Фильтрация событий с привязкой к CRM...');
 
+  // DEBUG: show first event raw structure
+  if (events.length > 0) {
+    var dbg = document.getElementById('errorMsg');
+    dbg.style.display = 'block';
+    dbg.style.background = '#e3f2fd';
+    dbg.style.borderColor = '#90caf9';
+    dbg.style.color = '#0d47a1';
+    dbg.innerHTML = '<b>Получено событий: ' + events.length + '</b><br>Первое событие (структура):<pre style="font-size:11px;overflow:auto;max-height:300px;white-space:pre-wrap">' + JSON.stringify(events[0], null, 2) + '</pre>';
+    hideProgress();
+    document.getElementById('btnLoad').disabled = false;
+    return;
+  }
+
   var crmEvents = events.filter(function(e) {
     return e.CRM && e.CRM.length > 0 && e.DATE_FROM && e.DATE_TO;
   });
