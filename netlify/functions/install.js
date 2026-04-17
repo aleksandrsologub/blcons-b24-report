@@ -1,7 +1,21 @@
 exports.handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 200, headers: {"Content-Type":"application/json"}, body: '{"status":"ok"}' };
+  const method = event.httpMethod;
+  const params = method === "POST"
+    ? Object.fromEntries(new URLSearchParams(event.body || ""))
+    : event.queryStringParameters || {};
+
+  const domain = params.DOMAIN || params.domain || "";
+  const authId = params.AUTH_ID || params.auth_id || "";
+
+  if (method === "POST" && domain) {
+    const redirectUrl = "https://" + domain + "/marketplace/installed/finish/?authId=" + encodeURIComponent(authId);
+    return {
+      statusCode: 302,
+      headers: { "Location": redirectUrl },
+      body: ""
+    };
   }
+
   const html = `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -688,7 +702,7 @@ function loadDemoData() {
 `;
   return {
     statusCode: 200,
-    headers: {"Content-Type": "text/html; charset=utf-8"},
+    headers: { "Content-Type": "text/html; charset=utf-8" },
     body: html
   };
 };
