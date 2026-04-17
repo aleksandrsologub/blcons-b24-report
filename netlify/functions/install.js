@@ -224,22 +224,21 @@ function loadReport() {
   };
   if (userFilter) calParams.ownerId = userFilter;
 
-  document.getElementById('errorMsg').style.display = 'block';
-  document.getElementById('errorMsg').style.background = '#fff8e1';
-  document.getElementById('errorMsg').style.color = '#5d4037';
-  document.getElementById('errorMsg').innerHTML = 'Запрос: <pre>' + JSON.stringify(calParams, null, 2) + '</pre>';
+  setProgress(10, 'Получение списка сотрудников...');
 
-  BX24.callMethod('calendar.event.get', calParams, function(res) {
-    var dbg = document.getElementById('errorMsg');
-    if (res.error()) {
-      dbg.innerHTML += '<br><b>Ошибка:</b> ' + JSON.stringify(res.error());
-    } else {
-      var data = res.data();
-      dbg.innerHTML += '<br><b>Результат (' + (data ? data.length : 0) + ' событий):</b><pre style="font-size:11px;max-height:300px;overflow:auto">' + JSON.stringify(data && data[0], null, 2) + '</pre>';
-    }
-    hideProgress();
-    document.getElementById('btnLoad').disabled = false;
-  });
+  // Determine which user IDs to query
+  var targetUserIds = userFilter ? [userFilter] : Object.keys(usersMap);
+
+  if (!targetUserIds.length) {
+    // fallback: get current user
+    BX24.callMethod('user.current', {}, function(res) {
+      var u = res.data();
+      if (u) targetUserIds = [String(u.ID)];
+      fetchEventsForUsers(targetUserIds, dateFrom, dateTo);
+    });
+    return;
+  }
+  fetchEventsForUsers(targetUserIds, dateFrom, dateTo);
   return;
   callAll('calendar.event.get', calParams, function(events) {
     var dbg = document.getElementById('errorMsg');
@@ -309,7 +308,12 @@ function buildRows(events) {
     var durMin = Math.round((dto - dfrom) / 60000);
     if (durMin <= 0) return;
 
-    var crmLinks = (e.CRM || []).filter(function(c) { return c.TYPE === 'DEAL'; });
+    var crmLinks = (e.CRM || []).filter(function(c) {
+      return c.TYPE === 'DEAL' || c.ENTITY_TYPE === 'DEAL' || c.CRM_TYPE === 'DEAL';
+    });
+    crmLinks = crmLinks.map(function(c) {
+      return { TYPE: 'DEAL', ID: String(c.ID || c.ENTITY_ID || c.CRM_ID || '') };
+    });
     if (!crmLinks.length) return;
 
     crmLinks.forEach(function(c) {
@@ -528,6 +532,87 @@ function callAll(method, params, onSuccess, onError) {
     });
   }
   next();
+}
+
+function fetchEventsForUsers(userIds, dateFrom, dateTo) {
+  setProgress(20, 'Загрузка событий (' + userIds.length + ' сотрудников)...');
+  var allEvents = [];
+  var done = 0;
+
+  if (!userIds.length) {
+    processEvents([]);
+    return;
+  }
+
+  userIds.forEach(function(uid) {
+    BX24.callMethod('calendar.event.get', {
+      type: 'user',
+      ownerId: uid,
+      from: dateFrom,
+      to: dateTo
+    }, function(res) {
+      done++;
+      if (!res.error()) {
+        var data = res.data() || [];
+        data.forEach(function(e) {
+          if (!e.OWNER_ID) e.OWNER_ID = uid;
+          allEvents.push(e);
+        });
+      }
+      var pct = 20 + Math.round((done / userIds.length) * 40);
+      setProgress(pct, 'Загружено сотрудников: ' + done + ' / ' + userIds.length);
+      if (done === userIds.length) {
+        processEvents(allEvents);
+      }
+    });
+  });
+}
+
+function processEvents(events) {
+  setProgress(65, 'Фильтрация событий с привязкой к CRM...');
+
+  var crmEvents = events.filter(function(e) {
+    return e.CRM && e.CRM.length > 0 && e.DATE_FROM && e.DATE_TO;
+  });
+
+  if (crmEvents.length === 0) {
+    hideProgress();
+    document.getElementById('btnLoad').disabled = false;
+    showError('За выбранный период не найдено событий с привязкой к сделкам.');
+    return;
+  }
+
+  setProgress(70, 'Загрузка данных сделок...');
+
+  var dealIds = [];
+  crmEvents.forEach(function(e) {
+    (e.CRM || []).forEach(function(c) {
+      if ((c.TYPE === 'DEAL' || c.ENTITY_TYPE === 'DEAL') && dealIds.indexOf(String(c.ID || c.ENTITY_ID)) === -1) {
+        dealIds.push(String(c.ID || c.ENTITY_ID));
+      }
+    });
+  });
+
+  loadDeals(dealIds, function() {
+    setProgress(90, 'Загрузка данных сотрудников...');
+    var ownerIds = [];
+    crmEvents.forEach(function(e) {
+      var id = String(e.OWNER_ID || e.USER_ID || '');
+      if (id && ownerIds.indexOf(id) === -1) ownerIds.push(id);
+    });
+    loadMissingUsers(ownerIds, function() {
+      setProgress(98, 'Формирование отчёта...');
+      rawData = buildRows(crmEvents);
+      setTimeout(function() {
+        hideProgress();
+        document.getElementById('btnLoad').disabled = false;
+        document.getElementById('resultPanel').style.display = 'block';
+        updateStats(rawData);
+        sortCol = null;
+        renderTable();
+      }, 300);
+    });
+  });
 }
 
 function loadDeals(ids, cb) {
