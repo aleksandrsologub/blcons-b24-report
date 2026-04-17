@@ -299,21 +299,26 @@ function loadReport() {
   });
 }
 
+function parseB24Date(s) {
+  if (!s) return new Date(NaN);
+  // format: "14.04.2026 10:30:00"
+  var m = s.match(/(\\d{2})\\.(\\d{2})\\.(\\d{4}) (\\d{2}):(\\d{2}):(\\d{2})/);
+  if (m) return new Date(m[3], m[2]-1, m[1], m[4], m[5], m[6]);
+  return new Date(s);
+}
+
 function buildRows(events) {
   var rows = [];
   events.forEach(function(e) {
     var userId = String(e.OWNER_ID || e.USER_ID || '');
-    var dfrom = new Date(e.DATE_FROM);
-    var dto = new Date(e.DATE_TO);
+    var dfrom = parseB24Date(e.DATE_FROM);
+    var dto = parseB24Date(e.DATE_TO);
     var durMin = Math.round((dto - dfrom) / 60000);
     if (durMin <= 0) return;
 
-    var crmLinks = (e.CRM || []).filter(function(c) {
-      return c.TYPE === 'DEAL' || c.ENTITY_TYPE === 'DEAL' || c.CRM_TYPE === 'DEAL';
-    });
-    crmLinks = crmLinks.map(function(c) {
-      return { TYPE: 'DEAL', ID: String(c.ID || c.ENTITY_ID || c.CRM_ID || '') };
-    });
+    var crmLinks = (e.UF_CRM_CAL_EVENT || [])
+      .filter(function(val) { return typeof val === 'string' && val.indexOf('D_') === 0; })
+      .map(function(val) { return { TYPE: 'DEAL', ID: val.replace('D_', '') }; });
     if (!crmLinks.length) return;
 
     crmLinks.forEach(function(c) {
@@ -571,21 +576,9 @@ function fetchEventsForUsers(userIds, dateFrom, dateTo) {
 function processEvents(events) {
   setProgress(65, 'Фильтрация событий с привязкой к CRM...');
 
-  // DEBUG: show first event raw structure
-  if (events.length > 0) {
-    var dbg = document.getElementById('errorMsg');
-    dbg.style.display = 'block';
-    dbg.style.background = '#e3f2fd';
-    dbg.style.borderColor = '#90caf9';
-    dbg.style.color = '#0d47a1';
-    dbg.innerHTML = '<b>Получено событий: ' + events.length + '</b><br>Первое событие (структура):<pre style="font-size:11px;overflow:auto;max-height:300px;white-space:pre-wrap">' + JSON.stringify(events[0], null, 2) + '</pre>';
-    hideProgress();
-    document.getElementById('btnLoad').disabled = false;
-    return;
-  }
-
   var crmEvents = events.filter(function(e) {
-    return e.CRM && e.CRM.length > 0 && e.DATE_FROM && e.DATE_TO;
+    var crm = e.UF_CRM_CAL_EVENT;
+    return crm && crm.length > 0 && e.DATE_FROM && e.DATE_TO;
   });
 
   if (crmEvents.length === 0) {
@@ -599,9 +592,10 @@ function processEvents(events) {
 
   var dealIds = [];
   crmEvents.forEach(function(e) {
-    (e.CRM || []).forEach(function(c) {
-      if ((c.TYPE === 'DEAL' || c.ENTITY_TYPE === 'DEAL') && dealIds.indexOf(String(c.ID || c.ENTITY_ID)) === -1) {
-        dealIds.push(String(c.ID || c.ENTITY_ID));
+    (e.UF_CRM_CAL_EVENT || []).forEach(function(val) {
+      if (typeof val === 'string' && val.indexOf('D_') === 0) {
+        var id = val.replace('D_', '');
+        if (dealIds.indexOf(id) === -1) dealIds.push(id);
       }
     });
   });
